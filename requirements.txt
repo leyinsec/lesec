@@ -18,3 +18,5 @@ async-timeout>=4.0.0
 charset-normalizer>=3.0.0
 multidict>=6.0.0
 yarl>=1.9.0
+pyinstaller>=6.0.0
+packaging>=23.0

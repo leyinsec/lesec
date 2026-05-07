@@ -1,0 +1,148 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v2.0.0)'
+        required: true
+        default: 'v2.0.0'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build CLI executable
+        run: |
+          pyinstaller aipt-cli.spec --clean --noconfirm
+
+      - name: Build GUI executable
+        run: |
+          pyinstaller aipt-gui.spec --clean --noconfirm
+
+      - name: Package executables
+        run: |
+          mkdir aipt-pro-windows
+          copy dist\aipt-cli.exe aipt-pro-windows\
+          copy dist\aipt-gui.exe aipt-pro-windows\
+          7z a aipt-pro-windows.zip aipt-pro-windows\
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aipt-pro-windows
+          path: aipt-pro-windows.zip
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build CLI executable
+        run: |
+          pyinstaller aipt-cli.spec --clean --noconfirm
+
+      - name: Build GUI executable
+        run: |
+          pyinstaller aipt-gui.spec --clean --noconfirm
+
+      - name: Package executables
+        run: |
+          mkdir -p aipt-pro-linux
+          cp dist/aipt-cli aipt-pro-linux/
+          cp dist/aipt-gui aipt-pro-linux/
+          tar -czvf aipt-pro-linux.tar.gz aipt-pro-linux/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aipt-pro-linux
+          path: aipt-pro-linux.tar.gz
+
+  release:
+    needs: [build-windows, build-linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: aipt-pro-windows
+          path: ./artifacts/
+
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: aipt-pro-linux
+          path: ./artifacts/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ./artifacts/aipt-pro-windows.zip
+            ./artifacts/aipt-pro-linux.tar.gz
+          tag_name: ${{ github.ref_name || github.event.inputs.version }}
+          name: AiPT Pro ${{ github.ref_name || github.event.inputs.version }}
+          body: |
+            ## AiPT Pro - AI-Enhanced Penetration Testing Platform
+
+            ### Included Executables
+            - `aipt-cli` - Command-line interface
+            - `aipt-gui` - Desktop GUI application
+
+            ### Platforms
+            - Windows (x64)
+            - Linux (x64)
+
+            ### Usage
+            **CLI:**
+            ```bash
+            aipt-cli https://example.com --full
+            ```
+
+            **GUI:**
+            Simply double-click `aipt-gui` to launch the desktop application.
+
+            ### Features
+            - AI-powered anomaly detection
+            - Comprehensive vulnerability scanning (SQLi, XSS, SSRF, etc.)
+            - JavaScript security audit
+            - Multi-format report generation (JSON, HTML, CSV, SARIF, XML)
+            - Authentication support (Token, Basic, OAuth, Cookie)
+            - Proxy support with rotation
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
